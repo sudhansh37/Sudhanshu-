@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Question Answering - BharatGPT</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* Apply Inter font to the entire body */
+        body {
+            font-family: 'Inter', sans-serif;
+            /* Background color from suggested palette: Light Cream */
+            background-color: #FFF8E1;
+        }
+        /* Custom scrollbar for textarea */
+        textarea::-webkit-scrollbar {
+            width: 8px;
+        }
+        textarea::-webkit-scrollbar-track {
+            background: #f0e6d6; /* Slightly darker cream for scrollbar track */
+            border-radius: 10px;
+        }
+        textarea::-webkit-scrollbar-thumb {
+            background-color: #FF9933; /* Saffron for scrollbar thumb */
+            border-radius: 10px;
+            border: 2px solid #FFF8E1;
+        }
+        textarea::-webkit-scrollbar-thumb:hover {
+            background-color: #e68a2e; /* Darker saffron on hover */
+        }
+    </style>
+</head>
+
+<body class="min-h-screen flex items-center justify-center p-4">
+    <div class="bg-white p-8 rounded-2xl shadow-xl max-w-2xl w-full border border-gray-100">
+        <h1 class="text-3xl md:text-4xl font-extrabold text-[#FF9933] mb-6 text-center">
+            BharatGPT: Ask Anything!
+        </h1>
+
+        <div class="mb-6">
+            <label for="question-input" class="block text-lg font-medium text-[#1B4F72] mb-2">आपका प्रश्न / Your Question:</label>
+            <textarea
+                id="question-input"
+                rows="5"
+                class="w-full p-3 border border-gray-300 rounded-lg focus:ring-[#FF9933] focus:border-[#FF9933] shadow-sm resize-y text-gray-800 placeholder-gray-400 transition-all duration-200"
+                placeholder="यहाँ अपना प्रश्न लिखें... / Type your question here..."
+            ></textarea>
+        </div>
+
+        <div class="flex justify-center mb-6">
+            <button
+                id="ask-button"
+                class="bg-[#138808] text-white font-semibold py-3 px-8 rounded-xl shadow-lg hover:bg-[#0f6b06] focus:outline-none focus:ring-2 focus:ring-[#138808] focus:ring-offset-2 transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+                उत्तर प्राप्त करें / Get Answer
+            </button>
+        </div>
+
+        <div id="loading-indicator" class="hidden flex justify-center items-center mb-6">
+            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-[#FF9933]"></div>
+            <p class="ml-3 text-[#FF9933] font-medium">सोच रहा है... / Thinking...</p>
+        </div>
+
+        <div class="mt-8">
+            <h2 class="text-2xl font-bold text-[#1B4F72] mb-4 text-center">AI का उत्तर / AI's Answer:</h2>
+            <div
+                id="answer-display"
+                class="min-h-[100px] p-4 bg-gray-50 border border-gray-200 rounded-lg text-[#1B4F72] leading-relaxed whitespace-pre-wrap shadow-inner"
+            >
+                प्रश्न पूछकर शुरू करें! / Ask a question to get started!
+            </div>
+        </div>
+
+        <div id="error-message" class="hidden mt-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded-lg text-sm text-center">
+            </div>
+    </div>
+
+    <script>
+        // Get references to DOM elements
+        const questionInput = document.getElementById('question-input');
+        const askButton = document.getElementById('ask-button');
+        const loadingIndicator = document.getElementById('loading-indicator');
+        const answerDisplay = document.getElementById('answer-display');
+        const errorMessage = document.getElementById('error-message');
+
+        // !!!!!!!!!!!!!!!! IMPORTANT: THIS API KEY IS EXPOSED !!!!!!!!!!!!!!!!
+        // !!!!!!!!!!!!!!!! DO NOT USE THIS IN PRODUCTION WITHOUT A BACKEND !!!!!!!!!!!!!!!!
+        const GEMINI_API_KEY = 'AIzaSyDVdvwI9ST422FdwZSmsSRwY7tza46OhuM'; // Using the key you provided
+        // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+        // Function to display an error message
+        function showError(message) {
+            errorMessage.textContent = message;
+            errorMessage.classList.remove('hidden');
+        }
+
+        // Function to hide the error message
+        function hideError() {
+            errorMessage.classList.add('hidden');
+            errorMessage.textContent = '';
+        }
+
+        // Event listener for the "Get Answer" button
+        askButton.addEventListener('click', async () => {
+            const prompt = questionInput.value.trim(); // Get and trim the user's question
+
+            // Clear previous answer and error
+            answerDisplay.textContent = '';
+            hideError();
+
+            if (!prompt) {
+                showError('कृपया प्रश्न दर्ज करें / Please enter a question.');
+                return;
+            }
+
+            // Show loading indicator and disable button
+            loadingIndicator.classList.remove('hidden');
+            askButton.disabled = true;
+            answerDisplay.textContent = 'उत्तर बना रहा है... / Generating answer...'; // Provide immediate feedback
+
+            try {
+                // Construct the API request payload
+                const chatHistory = [];
+                chatHistory.push({ role: "user", parts: [{ text: prompt }] });
+                const payload = { contents: chatHistory };
+
+                // Define the API URL
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
+
+                // Make the fetch call to the Gemini API
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                // Check if the response was successful
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(`API error: ${response.status} - ${errorData.error.message || 'Unknown error'}`);
+                }
+
+                const result = await response.json();
+
+                // Check for valid response structure
+                if (result.candidates && result.candidates.length > 0 &&
+                    result.candidates[0].content && result.candidates[0].content.parts &&
+                    result.candidates[0].content.parts.length > 0) {
+                    const text = result.candidates[0].content.parts[0].text;
+                    answerDisplay.textContent = text; // Display the AI's answer
+                } else {
+                    // Handle cases where the response structure is unexpected or content is missing
+                    showError('AI से वैध प्रतिक्रिया प्राप्त करने में विफल। कृपया पुनः प्रयास करें। / Failed to get a valid response from the AI. Please try again.');
+                    answerDisplay.textContent = 'कोई उत्तर नहीं मिला। / No answer generated.';
+                }
+
+            } catch (error) {
+                console.error('Error fetching AI response:', error);
+                showError(`एक त्रुटि हुई: ${error.message}। कृपया पुनः प्रयास करें। / An error occurred: ${error.message}. Please try again.`);
+                answerDisplay.textContent = 'उत्तर लाने में त्रुटि। / Error fetching answer.';
+            } finally {
+                // Hide loading indicator and enable button
+                loadingIndicator.classList.add('hidden');
+                askButton.disabled = false;
+            }
+        });
+    </script>
+    
+    <script type="text/javascript">
+        atOptions = {
+            'key' : 'a929830c4a83c6c2b3a067404e8d11b7',
+            'format' : 'iframe',
+            'height' : 60,
+            'width' : 468,
+            'params' : {}
+        };
+    </script>
+
+</body>
+</html>
